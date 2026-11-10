@@ -462,19 +462,34 @@ class Accept:
             provided type is returned as-is.
         """
         types = [MediaTypeHeader(t) for t in provided_types]
+        best_priority = (0, -1)
+        best_result = default
 
-        for accepted in self._accepted_types:
-            for provided in types:
-                if provided.match(accepted):
-                    # Return the accepted type with wildcards replaced
-                    # by concrete parts from the provided type
-                    result = copy(provided)
-                    if result.subtype == "*":
-                        result.subtype = accepted.subtype
-                    if result.maintype == "*":
-                        result.maintype = accepted.maintype
-                    return str(result)
-        return default
+        for provided in types:
+            matching = [accepted for accepted in self._accepted_types if provided.match(accepted)]
+            if not matching:
+                continue
+
+            # The most-specific matching range determines
+            # the effective quality of this representation.
+            # _accepted_types is already sorted by quality,
+            # so equal-specificity ties retain the higher quality.
+            accepted = max(matching, key=lambda t: t.priority[1])
+            priority = accepted.priority
+
+            # A quality of zero means explicitly unacceptable.
+            if priority[0] <= 0 or priority <= best_priority:
+                continue
+
+            result = copy(provided)
+            if result.subtype == "*":
+                result.subtype = accepted.subtype
+            if result.maintype == "*":
+                result.maintype = accepted.maintype
+            best_priority = priority
+            best_result = str(result)
+
+        return best_result
 
     def accepts(self, media_type: str) -> bool:
         """Check if the request accepts the specified media type.

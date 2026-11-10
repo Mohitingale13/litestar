@@ -376,6 +376,21 @@ def test_etag_to_header_weak() -> None:
         ("text/plain;q=0.8,text/html", ["text/plain", "text/html"], "text/html"),
         ("text/plain;q=ab,text/html", ["text/plain", "text/html"], "text/plain"),
         ("text/*,text/html", ["text/plain", "text/html"], "text/html"),
+        # Explicitly rejected media types must not be returned.
+        ("text/plain;q=0", ["text/plain"], None),
+        ("text/html;q=0.0", ["text/html"], None),
+        # A more-specific exclusion overrides a less-specific wildcard.
+        ("text/*;q=1,text/html;q=0", ["text/html"], None),
+        # The exclusion must not affect other media types matching the wildcard.
+        ("text/*;q=1,text/html;q=0", ["text/plain"], "text/plain"),
+        # A more-specific positive range overrides a wildcard exclusion.
+        ("text/*;q=0,text/html;q=1", ["text/html"], "text/html"),
+        # Normal quality preference must continue working.
+        ("text/html;q=0.5,text/plain;q=0.8", ["text/html", "text/plain"], "text/plain"),
+        # Wildcard quality should apply when no more-specific range exists.
+        ("text/*;q=0.5", ["text/html"], "text/html"),
+        # Candidate selection excludes rejected types while choosing acceptable alternatives.
+        ("text/*;q=0.5,text/html;q=0", ["text/plain", "text/html"], "text/plain"),
     ),
 )
 def test_accept_best_match(accept_value: str, provided_types: list[str], best_match: Optional[str]) -> None:
